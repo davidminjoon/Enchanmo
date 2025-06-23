@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>638</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QWidget" name="horizontalLayoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>9</x>
+      <y>9</y>
+      <width>621</width>
+      <height>421</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <layout class="QVBoxLayout" name="leftHLayout">
+       <item>
+        <widget class="QLabel" name="memberSelectLabel">
+         <property name="text">
+          <string>멤버별 검색</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <layout class="QGridLayout" name="memberSelect">
+           <item row="0" column="0">
+            <widget class="QPushButton" name="lilyButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>릴리</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QPushButton" name="sulyoonButton">
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>설윤</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QPushButton" name="haewonButton">
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>해원</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QPushButton" name="baeButton">
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>배이</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QPushButton" name="jiwooButton">
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>지우</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QPushButton" name="kyujinButton">
+             <property name="maximumSize">
+              <size>
+               <width>60</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>규진</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="Line" name="memberVSep">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="memberLogic">
+           <item>
+            <widget class="QRadioButton" name="logicAll">
+             <property name="text">
+              <string>모두 포함</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="logicExact">
+             <property name="text">
+              <string>정확하게</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="logicOr">
+             <property name="text">
+              <string>적어도 하나</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="leftHSep1">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="tagSelectLabel">
+         <property name="text">
+          <string>태그로 검색</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="tagSelect">
+         <property name="bottomMargin">
+          <number>9</number>
+         </property>
+         <item>
+          <widget class="QComboBox" name="tagCombobox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="tagAppend">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>40</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>추가</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="selectedTagsLabel">
+         <property name="text">
+          <string>설정 태그 (모두):</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="leftHSep2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="dateSelectLabel">
+         <property name="text">
+          <string>사진이 올라온 일자 범위 설정</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="dateSelect">
+         <item row="0" column="1">
+          <widget class="QCheckBox" name="fromCheckbox">
+           <property name="text">
+            <string>이 날부터</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QDateEdit" name="fromDate">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QDateEdit" name="toDate">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QCheckBox" name="toCheckbox">
+           <property name="text">
+            <string>이 날까지</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="leftHSep3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="miscSettingsLabel">
+         <property name="text">
+          <string>기타 검색 설정</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="miscSettings">
+         <item>
+          <widget class="QCheckBox" name="banHommaInclude">
+           <property name="text">
+            <string>금지 홈마 포함</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="bubbleInclude">
+           <property name="text">
+            <string>버블 포함</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="Line" name="leftHSep4">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="devCreditLabel">
+         <property name="text">
+          <string>&quot;따스한 엔써&quot; ©</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="openChatCredit">
+         <property name="text">
+          <string>[엔써들의 찬란한 모임 &amp; 엔끌벅적 엔써들의 소통방]</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="verInfoLabel">
+         <property name="text">
+          <string>ver. 1.0.0 (2025. 06. 22)</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="rightVLayout">
+       <item>
+        <widget class="QLabel" name="searchResultLabel">
+         <property name="text">
+          <string>검색 결과</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="searchScrollArea">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="scrollAreaWidgetContents">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>302</width>
+            <height>337</height>
+           </rect>
+          </property>
+          <widget class="QWidget" name="verticalLayoutWidget">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>301</width>
+             <height>331</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="imageDisplayVLayout"/>
+          </widget>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="selectManipulator">
+         <item>
+          <widget class="QPushButton" name="selectAll">
+           <property name="text">
+            <string>모두 선택</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="deselectAll">
+           <property name="text">
+            <string>모두 제외</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="selectComplement">
+           <property name="text">
+            <string>선택 반전</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QPushButton" name="exportToFolder">
+         <property name="text">
+          <string>폴더로 내보내기</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>638</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>설정</string>
+    </property>
+    <widget class="QMenu" name="menueditBanHomma">
+     <property name="title">
+      <string>금지 홈마 설정</string>
+     </property>
+     <addaction name="actionaddBanHomma_2"/>
+     <addaction name="actionlookBanHomma"/>
+    </widget>
+    <addaction name="menueditBanHomma"/>
+    <addaction name="actionsetBubbleDirectory"/>
+   </widget>
+   <widget class="QMenu" name="menu_2">
+    <property name="title">
+     <string>사진</string>
+    </property>
+    <widget class="QMenu" name="menu_3">
+     <property name="title">
+      <string>금지 홈마 검사</string>
+     </property>
+     <addaction name="actionsingleBanHommaCheck"/>
+     <addaction name="actionmultipleBanHommaCheck"/>
+    </widget>
+    <widget class="QMenu" name="menu_4">
+     <property name="title">
+      <string>버블 검사</string>
+     </property>
+     <addaction name="actionsingleBubbleCheck"/>
+     <addaction name="actionmultipleBubbleCheck"/>
+    </widget>
+    <addaction name="actionaddPhotos"/>
+    <addaction name="actionexportPhotos"/>
+    <addaction name="separator"/>
+    <addaction name="menu_3"/>
+    <addaction name="menu_4"/>
+    <addaction name="separator"/>
+    <addaction name="actioneditTags"/>
+   </widget>
+   <widget class="QMenu" name="menu_5">
+    <property name="title">
+     <string>검색</string>
+    </property>
+    <addaction name="actiongroupByTag"/>
+    <addaction name="actiongroupByMember"/>
+    <addaction name="actiongroupByPhotoDate"/>
+    <addaction name="actiongroupByAddedDate"/>
+    <addaction name="actiongroupByHomma"/>
+    <addaction name="separator"/>
+    <addaction name="actionsearchSimilar"/>
+    <addaction name="actionsearchBubble"/>
+   </widget>
+   <addaction name="menu"/>
+   <addaction name="menu_2"/>
+   <addaction name="menu_5"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionaddBanHomma_2">
+   <property name="text">
+    <string>금지 홈마 추가</string>
+   </property>
+  </action>
+  <action name="actionlookBanHomma">
+   <property name="text">
+    <string>금지 홈마 편집</string>
+   </property>
+  </action>
+  <action name="actionsetBubbleDirectory">
+   <property name="text">
+    <string>버블 폴더 설정</string>
+   </property>
+  </action>
+  <action name="actionaddPhotos">
+   <property name="text">
+    <string>사진 추가하기</string>
+   </property>
+  </action>
+  <action name="actionexportPhotos">
+   <property name="text">
+    <string>사진 내보내기</string>
+   </property>
+  </action>
+  <action name="actioneditTags">
+   <property name="text">
+    <string>태그 편집</string>
+   </property>
+  </action>
+  <action name="actionsingleBanHommaCheck">
+   <property name="text">
+    <string>복사한 사진의 금지 홈마 검사</string>
+   </property>
+  </action>
+  <action name="actionmultipleBanHommaCheck">
+   <property name="text">
+    <string>여러 사진의 금지 홈마 검사</string>
+   </property>
+  </action>
+  <action name="actionsingleBubbleCheck">
+   <property name="text">
+    <string>복사한 사진의 버블 검사</string>
+   </property>
+  </action>
+  <action name="actionmultipleBubbleCheck">
+   <property name="text">
+    <string>여러 사진의 버블 검사</string>
+   </property>
+  </action>
+  <action name="actiongroupByTag">
+   <property name="text">
+    <string>태그로 검색</string>
+   </property>
+  </action>
+  <action name="actiongroupByMember">
+   <property name="text">
+    <string>멤버로 검색</string>
+   </property>
+  </action>
+  <action name="actiongroupByPhotoDate">
+   <property name="text">
+    <string>사진 일자로 검색</string>
+   </property>
+  </action>
+  <action name="actiongroupByAddedDate">
+   <property name="text">
+    <string>추가한 일자로 검색</string>
+   </property>
+  </action>
+  <action name="actionsearchSimilar">
+   <property name="text">
+    <string>비슷한 사진 검색</string>
+   </property>
+  </action>
+  <action name="actionsearchBubble">
+   <property name="text">
+    <string>비슷한 버블 검색</string>
+   </property>
+  </action>
+  <action name="actiongroupByHomma">
+   <property name="text">
+    <string>홈마 ID로 검색</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
