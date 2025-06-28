@@ -13,7 +13,7 @@ from PIL import Image
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget, QFrame, \
     QTabWidget, QLabel, QPushButton, QRadioButton, QComboBox, QDateEdit, QCheckBox, QSizePolicy, QAction, \
     QDialog, QLineEdit, QFileDialog, QLayout, QMessageBox, QButtonGroup, QSpinBox, QScrollArea, QProgressBar
-from PyQt5.QtGui import QFont, QPixmap, QImage
+from PyQt5.QtGui import QFont, QPixmap, QImage, QIcon
 from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
 
 qimage = None
@@ -40,6 +40,7 @@ class WorkerThread(QThread):
 class ProgressDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowIcon(QIcon('./img/circleicon.ico'))
         self.setWindowTitle("진행 중...")
 
         self.setModal(True)
@@ -64,6 +65,7 @@ class GodokAssistant(QMainWindow):
         def __init__(self, godok: Godok):
             super().__init__()
             self.godok = godok
+            self.setWindowIcon(QIcon('./img/circleicon.ico'))
 
             # Highest object hierarchy
             self.bigVLayout = QVBoxLayout()
@@ -124,6 +126,7 @@ class GodokAssistant(QMainWindow):
     class SimilarityDialog(QDialog):
         def __init__(self, superUI: GodokAssistant):
             super().__init__()
+            self.setWindowIcon(QIcon('./img/circleicon.ico'))
             self.superUI: GodokAssistant = superUI
             self.godok: Godok = self.superUI.godok
             self.query_pillow: Image.Image | None = None
@@ -287,6 +290,7 @@ class GodokAssistant(QMainWindow):
     class ScrapeDialog(QDialog):
         def __init__(self, superUI):
             super().__init__()
+            self.setWindowIcon(QIcon('./img/circleicon.ico'))
             self.superUI: GodokAssistant = superUI
             self.savedir = ''
             self.url = ''
@@ -387,6 +391,8 @@ class GodokAssistant(QMainWindow):
     class DetailDialog(QDialog):
         def __init__(self, loadDirList: list[str], metadata: list[dict], desc: str, godok: Godok):
             super().__init__()
+            self.setWindowIcon(QIcon('./img/circleicon.ico'))
+            self.setWindowTitle("사진 자세히 보기")
             self.loadDirList = loadDirList
             self.godok = godok
             self.imageIndex = 0
@@ -681,6 +687,7 @@ class GodokAssistant(QMainWindow):
 
         # Visual aspects
         QApplication.setFont(QFont("SUITE", 10))
+        self.setWindowIcon(QIcon('./img/circleicon.ico'))
 
         # Initiator functions
         self.initUI()
