@@ -12,12 +12,51 @@ from functools import partial
 from PIL import Image
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget, QFrame, \
     QTabWidget, QLabel, QPushButton, QRadioButton, QComboBox, QDateEdit, QCheckBox, QSizePolicy, QAction, \
-    QDialog, QLineEdit, QFileDialog, QLayout, QMessageBox, QButtonGroup, QSpinBox, QScrollArea
+    QDialog, QLineEdit, QFileDialog, QLayout, QMessageBox, QButtonGroup, QSpinBox, QScrollArea, QProgressBar
 from PyQt5.QtGui import QFont, QPixmap, QImage
-from PyQt5.QtCore import Qt, QDate
-
+from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
 
 qimage = None
+
+
+class WorkerThread(QThread):
+    progress_updated = pyqtSignal(int)
+    finished = pyqtSignal()
+    result_ready = pyqtSignal(object)
+
+    def __init__(self, func, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.result = None
+
+    def run(self):
+        self.result = self.func(self.progress_updated.emit, *self.args, **self.kwargs)
+        self.result_ready.emit(self.result)
+        self.finished.emit()
+
+
+class ProgressDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("진행 중...")
+
+        self.setModal(True)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+
+        self.label = QLabel("처리 중입니다...")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedWidth(300)
+        self.progress_bar.setRange(0, 100)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress_bar)
+        self.setLayout(layout)
+
+    def update_progress(self, value):
+        self.progress_bar.setValue(value)
 
 
 class GodokAssistant(QMainWindow):
@@ -311,16 +350,28 @@ class GodokAssistant(QMainWindow):
             self.errInfo.setStyleSheet(f"Color : {'blue' if res else 'red'}")
             self.errInfo.setText(msg)
 
+        def __browseInitInternal(self, progress_callback):
+            return self.superUI.godok.scrape_tweet(progress_callback, self.url, self.savedir)
+
+        def __browseInitResHandle(self, retrieve):
+            if len(retrieve[0]) == 0:
+                QMessageBox.warning(self, "찾은 사진 없음", "주어진 링크에서 사진을 찾을 수 없었습니다."
+                                                      "가져오고자 하는 트윗이 공개 트윗인지, 사진이 있는지"
+                                                      "확인 후 다시 시도해주세요. 문제가 지속될 경우 개발자에게"
+                                                      "문의 부탁드립니다!", QMessageBox.Ok)
+                return
+            self.superUI.viewDetailDialog(*retrieve)
+
         def browseInit(self):
             try:
-                __retrieve = self.superUI.godok.scrape_tweet(self.url, self.savedir)
-                if len(__retrieve[0]) == 0:
-                    QMessageBox.warning(self, "찾은 사진 없음", "주어진 링크에서 사진을 찾을 수 없었습니다."
-                                                          "가져오고자 하는 트윗이 공개 트윗인지, 사진이 있는지"
-                                                          "확인 후 다시 시도해주세요. 문제가 지속될 경우 개발자에게"
-                                                          "문의 부탁드립니다!", QMessageBox.Ok)
-                    return
-                self.superUI.viewDetailDialog(*__retrieve)
+                __progressbar = ProgressDialog(self)
+                __worker = WorkerThread(self.__browseInitInternal)
+                __worker.progress_updated.connect(__progressbar.update_progress)
+                __worker.finished.connect(__progressbar.accept)
+                __worker.result_ready.connect(self.__browseInitResHandle)
+
+                __worker.start()
+                __progressbar.exec_()
 
             except Exception as e:
                 QMessageBox.critical(self, "오류 발생", f"사진을 불러오던 중 오류가 발생했습니다."
@@ -553,7 +604,6 @@ class GodokAssistant(QMainWindow):
 
             self.sourceLineEdit.setText(__local_metadata.get('source', ''))
             __member_meta = __local_metadata.get('members', 0)
-            print(__member_meta)
 
             self.lilyButton.setChecked(bool(__member_meta & (1 << 5)))
             self.haewonButton.setChecked(bool(__member_meta & (1 << 4)))
@@ -588,7 +638,6 @@ class GodokAssistant(QMainWindow):
             self.loadMetadata()
 
         def updateMetadata(self):
-            print(f"Metadata for index {self.imageIndex} updated")
             if not self.init_complete: return
             __local_old = self.metadata_collect[self.imageIndex]
             __new = {'source': self.sourceLineEdit.text(),
@@ -605,14 +654,23 @@ class GodokAssistant(QMainWindow):
                      'tags': [__edit.text() for __edit in self.tagManualEditList],
                      'dir': __local_old['dir']}
             self.metadata_collect[self.imageIndex] = __new
-            print(__new)
 
         def sendToGodok(self):
-            for __path, __meta in zip(self.loadDirList, self.metadata_collect):
+            __progressbar = ProgressDialog(self)
+            __worker = WorkerThread(self.__sendToGodokInternal)
+            __worker.progress_updated.connect(__progressbar.update_progress)
+            __worker.finished.connect(__progressbar.accept)
+
+            __worker.start()
+            __progressbar.exec_()
+
+        def __sendToGodokInternal(self, progress_callback):
+            for i, (__path, __meta) in enumerate(zip(self.loadDirList, self.metadata_collect)):
                 if self.copyToAllCheckbox.isChecked():
                     self.godok.add_entry(__path, self.metadata_collect[self.imageIndex])
                 else:
                     self.godok.add_entry(__path, __meta)
+                progress_callback(((i + 1) * 100) // len(self.loadDirList))
 
             self.godok.export()
             self.close()
@@ -1059,6 +1117,9 @@ class GodokAssistant(QMainWindow):
         if fname := QFileDialog.getExistingDirectory(self, "버블 폴더 설정"):
             self.godok.bubble_directory = fname
 
+        self.godok.export()
+        self.fetchGodokStats()
+
     def editBanHomma(self):
         editBanHomma = GodokAssistant.EditBanHomma(self.godok)
         editBanHomma.setGeometry(500, 500, 500, 500)
@@ -1279,7 +1340,6 @@ class GodokAssistant(QMainWindow):
 
         clipboard = QApplication.clipboard()
         clipboard.setImage(qimage)
-        print("Image copied to clipboard.")
 
 
 if __name__ == '__main__':

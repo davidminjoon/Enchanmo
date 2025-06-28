@@ -84,18 +84,19 @@ class Godok:
             return False
 
     @staticmethod
-    def scrape_tweet(url: str, save_dir: str) -> tuple[list[str], list[dict], str]:
+    def scrape_tweet(progress_callback, url: str, save_dir: str) -> tuple[list[str], list[dict], str]:
         # Set up Selenium WebDriver
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run in background
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
-        options.add_argument("--log-level=3")
 
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        progress_callback(20)
 
         driver.get(url)
         time.sleep(5)  # Let JS load
+        progress_callback(84)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         driver.quit()
@@ -105,6 +106,7 @@ class Godok:
 
         # Identify post time
         time_tag = soup.find('time')
+        progress_callback(85)
         dt_tuple = (2022, 2, 22)
 
         if time_tag and time_tag.has_attr('datetime'):
@@ -119,6 +121,7 @@ class Godok:
             if tag.get('property') == 'og:title':
                 tweet_text = tag.get('content', '').strip()
                 break
+        progress_callback(86)
 
         # Extract hashtags using regex
         hashtags: list[str] = re.findall(r'#\w+', tweet_text)
@@ -129,6 +132,7 @@ class Godok:
             src = img_tag.get('src')
             if src and 'media' in src and src not in images:
                 images.append(src)
+        progress_callback(88)
 
         load_imgdirs = []
         for idx, img_url in enumerate(images):
@@ -143,6 +147,8 @@ class Godok:
                 load_imgdirs.append(img_path)
             except Exception as e:
                 raise ConnectionError(f"Failed to download image {img_url}: {e}")
+            finally:
+                progress_callback(88 + (idx + 1) * (12 / len(images)))
 
         __met = {'source': url,
                  'members': any(['릴리' in hashtag for hashtag in hashtags]) * 32
@@ -172,7 +178,6 @@ class Godok:
         return __dat.tolist(), __sg[:Godok.SINGULAR_VALUES].tolist()
 
     def add_entry(self, path, metadata) -> bool:
-        print(f"Adding entry {os.path.split(path)[1]}")
         new_entry = False
 
         if path not in self.data.keys():
