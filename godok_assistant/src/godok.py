@@ -20,7 +20,6 @@ class Godok:
     COMPRESSED_DIMENSIONS = 32
 
     def __init__(self):
-        if not os.path.isdir('sto'): os.mkdir('sto')
         if not os.path.isdir('dat'): os.mkdir('dat')
 
         # Load figure (index primary key) metadata
@@ -58,12 +57,12 @@ class Godok:
 
     def export(self):
         with open('dat/metadata.json', 'w', encoding='utf-8') as f:
-            json.dump(self.data, f)
+            json.dump(self.data, f, ensure_ascii=True, indent=4)
         with open('dat/homma_metadata.json', 'w', encoding='utf-8') as f:
             json.dump({'photo': self.homma_to_photo, 'banned': self.banned_hommas,
-                       'bubble_dir': self.bubble_directory}, f)
+                       'bubble_dir': self.bubble_directory}, f, ensure_ascii=True, indent=4)
         with open('dat/tags.json', 'w', encoding='utf-8') as f:
-            json.dump(self.tag_counter, f)
+            json.dump(self.tag_counter, f, ensure_ascii=True, indent=4)
 
     @staticmethod
     def test_internet_connectivity(host="8.8.8.8", port=53, timeout=3):
@@ -85,6 +84,10 @@ class Godok:
 
     @staticmethod
     def scrape_tweet(progress_callback, url: str, save_dir: str) -> tuple[list[str], list[dict], str]:
+        def load_cookies(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
         # Set up Selenium WebDriver
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run in background
@@ -94,8 +97,20 @@ class Godok:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         progress_callback(20)
 
+        driver.get("https://x.com/")
+        time.sleep(3)
+        # Step 3: Inject cookies
+        cookies = load_cookies("dat/x_cookies.json")
+
+        for cookie in cookies:
+            cookie.pop("sameSite", None)  # optional fix for compatibility
+            try: driver.add_cookie(cookie)
+            except Exception as e: print(f"[-] Cookie error: {e} -- {cookie.get('name')}")
+
+        progress_callback(54)
+
         driver.get(url)
-        time.sleep(5)  # Let JS load
+        time.sleep(3)  # Let JS load
         progress_callback(84)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -187,18 +202,31 @@ class Godok:
             # Update DB
             self.data[path] = {'pix': __newpix, 'svd': __newsvd}
 
-        self.data[path]['meta'] = metadata
         if metadata['homma'] not in self.homma_to_photo.keys():
             self.homma_to_photo[metadata['homma']] = []
 
-        if new_entry:
-            self.homma_to_photo[metadata['homma']].append(path)
-            for __tag in metadata['tags']:
-                if len(__tag) == 0: continue
-                self.tag_counter[__tag] = self.tag_counter.get(__tag, 0) + 1
+        if new_entry: self.homma_to_photo[metadata['homma']].append(path)
+        else:
+            for __oldtag in self.data[path]['meta']['tags']:
+                if len(__oldtag) == 0: continue
+                self.tag_counter[__oldtag] -= 1
+                if self.tag_counter[__oldtag] == 0:
+                    del self.tag_counter[__oldtag]
+
+        for __tag in metadata['tags']:
+            if len(__tag) == 0: continue
+            self.tag_counter[__tag] = self.tag_counter.get(__tag, 0) + 1
+
+        self.data[path]['meta'] = metadata
         return new_entry
 
     def remove_entry(self, path) -> bool:
+        if os.path.isfile(path):
+            os.removedirs(path)
+
+        if path not in self.data.keys():
+            return False
+
         __homma = self.data[path]['meta']['homma']
         self.homma_to_photo[__homma].remove(path)
         if __homma != '(알 수 없음)' and len(self.homma_to_photo[__homma]) == 0:
@@ -315,17 +343,32 @@ class Godok:
 
         return __respath, __resmeta
 
-    def norm_rank(self, query_pix: list, query_svd: list, scope: list[str]) -> list[str]:
-        __scopepix = np.array([self.data[__path]['pix'] for __path in scope])
-        __scopesvd = np.array([self.data[__path]['svd'] for __path in scope])
+    def norm_rank(self, progress_callback, query_pix: list, query_svd: list, scope: list[str]) -> list[str]:
+        if len(scope) == 0: return []
 
-        pixel_dists = np.linalg.norm(__scopepix - query_pix, axis=1)
+        __scopepix_temp, __scopesvd_temp = [], []
+        for i, __path in enumerate(scope):
+            if __path in self.data.keys():
+                __pix = self.data[__path]['pix']
+                __svd = self.data[__path]['svd']
+            else:
+                __pix, __svd = Godok.pixsvd_from_pillow(Image.open(__path))
+            __scopepix_temp.append(__pix)
+            __scopesvd_temp.append(__svd)
+            progress_callback((i + 1) * 100 // len(scope))
+
+        __scopepix = np.array(__scopepix_temp)
+        __scopesvd = np.array(__scopesvd_temp)
+
+        pixel_dists_red = np.linalg.norm((__scopepix >> 16) - query_pix, axis=1)
+        pixel_dists_green = np.linalg.norm(((__scopepix >> 8) % 256) - query_pix, axis=1)
+        pixel_dists_blue = np.linalg.norm((__scopepix % 256) - query_pix, axis=1)
         svd_dists = np.linalg.norm(__scopesvd - query_svd, axis=1)
 
-        return [scope[i] for i in np.argsort(pixel_dists + svd_dists)]
+        return [scope[i] for i in np.argsort(pixel_dists_red + pixel_dists_green + pixel_dists_blue + svd_dists)]
 
     def get_metalist(self, paths: list[str]) -> list[dict]:
-        return [self.data[path]['meta'] for path in paths]
+        return [self.data[path]['meta'] if path in self.data.keys() else self.default_meta(path) for path in paths]
 
     def ban_homma(self, homma: str):
         if homma not in self.banned_hommas:
@@ -333,3 +376,12 @@ class Godok:
 
     def unban_homma(self, homma: str):
         self.banned_hommas.remove(homma)
+
+    @staticmethod
+    def default_meta(path: str) -> dict:
+        return {'source': '',
+                'members': 0,
+                'homma': '(알 수 없음)',
+                'date': (datetime.today().year, datetime.today().month, datetime.today().day),
+                'tags': [''] * 6,
+                'dir': os.path.split(path)[0]}

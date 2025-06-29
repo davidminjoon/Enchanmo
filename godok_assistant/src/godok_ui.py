@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+import json
+
 from godok import Godok
 
 from copy import deepcopy
@@ -12,11 +15,18 @@ from functools import partial
 from PIL import Image
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget, QFrame, \
     QTabWidget, QLabel, QPushButton, QRadioButton, QComboBox, QDateEdit, QCheckBox, QSizePolicy, QAction, \
-    QDialog, QLineEdit, QFileDialog, QLayout, QMessageBox, QButtonGroup, QSpinBox, QScrollArea, QProgressBar
-from PyQt5.QtGui import QFont, QPixmap, QImage, QIcon
+    QDialog, QLineEdit, QFileDialog, QLayout, QMessageBox, QButtonGroup, QSpinBox, QScrollArea, QProgressBar, QTextEdit
+from PyQt5.QtGui import QFont, QPixmap, QImage, QIcon, QFontDatabase
 from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
 
 qimage = None
+
+
+def resource_path(relative_path):
+    # This helps PyInstaller find your files in the temp folder (_MEIPASS) when bundled
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 
 class WorkerThread(QThread):
@@ -40,7 +50,7 @@ class WorkerThread(QThread):
 class ProgressDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowIcon(QIcon('./img/circleicon.ico'))
+        self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
         self.setWindowTitle("진행 중...")
 
         self.setModal(True)
@@ -65,7 +75,7 @@ class GodokAssistant(QMainWindow):
         def __init__(self, godok: Godok):
             super().__init__()
             self.godok = godok
-            self.setWindowIcon(QIcon('./img/circleicon.ico'))
+            self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
 
             # Highest object hierarchy
             self.bigVLayout = QVBoxLayout()
@@ -124,13 +134,15 @@ class GodokAssistant(QMainWindow):
             self.close()
 
     class SimilarityDialog(QDialog):
-        def __init__(self, superUI: GodokAssistant):
+        def __init__(self, superUI: GodokAssistant, enable: bool = True, msg: str = ''):
             super().__init__()
-            self.setWindowIcon(QIcon('./img/circleicon.ico'))
+            self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
             self.superUI: GodokAssistant = superUI
             self.godok: Godok = self.superUI.godok
             self.query_pillow: Image.Image | None = None
             self.setWindowTitle("유사한 사진 검색")
+            self.enableModifications: bool = enable
+            self.msg: str = msg
 
             # Highest object hierarchy
             self.bigHLayout = QHBoxLayout()
@@ -266,31 +278,46 @@ class GodokAssistant(QMainWindow):
             self.imageDisplayPixmapLabel.setPixmap(pixmap)
 
         def initSearchReact(self):
+            __progressbar = ProgressDialog(self)
+            __worker = WorkerThread(self.__initSearchReactInternal)
+            __worker.progress_updated.connect(__progressbar.update_progress)
+            __worker.finished.connect(__progressbar.accept)
+            __worker.result_ready.connect(self.__initSearchReactResHandle)
+
+            __worker.start()
+            __progressbar.exec_()
+
+        def __initSearchReactInternal(self, progress_callback):
             homma_scope = []
+            search_scope = []
+
             if self.hommaOnlyRadio.isChecked():
                 homma_scope.extend(self.godok.banned_hommas)
             elif self.bubbleOnlyRadio.isChecked():
-                homma_scope.extend(self.godok.bubble_paths)
+                search_scope.extend(self.godok.bubble_paths)
             else:
                 if self.hommaNoRadio.isChecked():
                     homma_scope.extend(self.godok.safe_hommas)
                 elif self.hommaAllRadio.isChecked():
                     homma_scope.extend(self.godok.hommas)
-                if self.bubbleAllRadio.isChecked(): homma_scope.extend(self.godok.bubble_paths)
+                if self.bubbleAllRadio.isChecked(): search_scope.extend(self.godok.bubble_paths)
 
-            search_scope = []
             for homma in homma_scope:
                 search_scope.extend(self.godok.homma_to_photo[homma])
 
             __qpix, __qsvd = Godok.pixsvd_from_pillow(self.query_pillow)
-            __rank = self.godok.norm_rank(__qpix, __qsvd, search_scope)[:self.resultCountSpinbox.value()]
+            return self.godok.norm_rank(progress_callback, __qpix, __qsvd, search_scope)[:self.resultCountSpinbox.value()]
+
+        def __initSearchReactResHandle(self, rank):
             self.close()
-            self.superUI.viewDetailDialog(__rank, self.godok.get_metalist(__rank), '')
+            self.superUI.viewDetailDialog(rank, self.godok.get_metalist(rank), '',
+                                          enable=self.enableModifications and self.bubbleNoRadio.isChecked(),
+                                          msg=self.msg)
 
     class ScrapeDialog(QDialog):
         def __init__(self, superUI):
             super().__init__()
-            self.setWindowIcon(QIcon('./img/circleicon.ico'))
+            self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
             self.superUI: GodokAssistant = superUI
             self.savedir = ''
             self.url = ''
@@ -315,6 +342,13 @@ class GodokAssistant(QMainWindow):
             self.saveDirDisplayLabel.setFont(QFont("SUITE", 7))
             self.saveDirBrowseButton.pressed.connect(self.browseSaveDir)
 
+            self.cookieConfirmLabel = QLabel("X(트위터) 쿠키 확인", self)
+            self.cookieConfirmDisplayLabel = QLabel("완료" if os.path.isfile('dat/x_cookies.json') else "설정 필요", self)
+            self.cookieConfirmDisplayLabel.setStyleSheet(f'color: {"blue" if os.path.isfile("dat/x_cookies.json") else "red"};')
+            self.cookieSetButton = QPushButton("→", self)
+            self.cookieSetButton.setFixedWidth(50)
+            self.cookieSetButton.pressed.connect(self.cookieSetReact)
+
             self.browseInitButton = QPushButton("사진 가져오기", self)
             self.browseInitButton.pressed.connect(self.browseInit)
             self.errInfo = QLabel(self)
@@ -325,13 +359,92 @@ class GodokAssistant(QMainWindow):
             self.bigGLayout.addWidget(self.saveDirLabel, 1, 0)
             self.bigGLayout.addWidget(self.saveDirDisplayLabel, 1, 1)
             self.bigGLayout.addWidget(self.saveDirBrowseButton, 1, 2)
-            self.bigGLayout.addWidget(self.browseInitButton, 2, 0)
-            self.bigGLayout.addWidget(self.errInfo, 2, 1)
+            self.bigGLayout.addWidget(self.cookieConfirmLabel, 2, 0)
+            self.bigGLayout.addWidget(self.cookieConfirmDisplayLabel, 2, 1)
+            self.bigGLayout.addWidget(self.cookieSetButton, 2, 2)
+            self.bigGLayout.addWidget(self.browseInitButton, 3, 0)
+            self.bigGLayout.addWidget(self.errInfo, 3, 1)
 
             self.validateForm()
 
         def changedText(self):
             self.url = self.urlLineEdit.text()
+            self.validateForm()
+
+        def cookieSetReact(self):
+            class CookieSettingDialog(QDialog):
+                def __init__(self):
+                    super().__init__()
+                    self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
+                    self.setWindowTitle("X 쿠키 설정")
+                    self.title = QLabel("[X에서 가져오기] 최초 실행에 따른 쿠키 설정", self)
+                    self.title.setAlignment(Qt.AlignCenter)
+                    self.title_expl = QLabel("X 정책 상, 로그인하지 않으면 볼 수 없는 게시물들이 있습니다. 이에 따라, \n"
+                                             "X에서 이미지를 가져오기 위해 로그인된 상태를 유지하기 위한 정보를 저장하는 \n"
+                                             "과정으로, 실제 로그인을 하기 위한 비밀번호는 고독한 조수가 알 수 없습니다. \n"
+                                             "어떠한 경우에도 고독한 조수는 계정 비밀번호를 알 수도 없고, 사용하지도 않습니다.",
+                                             self)
+
+                    self.desc = ['크롬 브라우저를 켜세요.',
+                                 'EditThisCookie 확장 프로그램을 설치하세요.',
+                                 'https://x.com/ 에 접속한 뒤, 로그인이 되어있지 않다면 로그인하세요.',
+                                 '우측 상단의 퍼즐 조각 모양을 눌러 EditThisCookie 확장 프로그램을 실행하세요.',
+                                 '상단 메뉴바의 다섯 번째 버튼 (오른쪽 화살표가 그려진 버튼)을 눌러 쿠키 정보를 복사하세요.',
+                                 '아래 빈칸에 붙여넣기한 뒤 완료 버튼을 누르세요.']
+
+                    self.xCookieTitleHDivider = QFrame(self)
+                    self.xCookieTitleHDivider.setFrameShape(QFrame.HLine)
+                    self.xCookieTitleHDivider.setFrameShadow(QFrame.Sunken)
+
+                    self.bigVLayout = QVBoxLayout()
+                    self.bigVLayout.setSizeConstraint(QLayout.SetFixedSize)
+                    self.setLayout(self.bigVLayout)
+
+                    self.bigVLayout.addWidget(self.title)
+                    self.bigVLayout.addWidget(self.title_expl)
+                    self.bigVLayout.addWidget(self.xCookieTitleHDivider)
+
+                    self.descGLayout = QGridLayout()
+                    for i, desc in enumerate(self.desc):
+                        self.descGLayout.addWidget(QLabel(str(i + 1), self), i, 0)
+                        self.descGLayout.addWidget(QLabel(desc, self), i, 1)
+
+                    self.openHomeButton = QPushButton("열기", self)
+                    self.openHomeButton.setMaximumWidth(80)
+                    self.openHomeButton.pressed.connect(partial(CookieSettingDialog.openURL, "https://x.com/"))
+                    self.openExtensionButton = QPushButton("열기", self)
+                    self.openExtensionButton.setMaximumWidth(80)
+                    self.openExtensionButton.pressed.connect(partial(CookieSettingDialog.openURL, "https://chromewebstore.google.com/detail/editthiscookie-v3/ojfebgpkimhlhcblbalbfjblapadhbol"))
+
+                    self.descGLayout.addWidget(self.openExtensionButton, 1, 2)
+                    self.descGLayout.addWidget(self.openHomeButton, 2, 2)
+                    self.bigVLayout.addLayout(self.descGLayout)
+
+                    self.cookiePasteEdit = QTextEdit(self)
+                    self.confirmButton = QPushButton("완료하기", self)
+                    self.confirmButton.pressed.connect(self.cookieConfirmReact)
+                    self.bigVLayout.addWidget(self.cookiePasteEdit)
+                    self.bigVLayout.addWidget(self.confirmButton)
+
+                @staticmethod
+                def openURL(url):
+                    import webbrowser
+                    webbrowser.open(url)
+
+                def cookieConfirmReact(self):
+                    with open('dat/x_cookies.json', 'w') as f:
+                        f.write(self.cookiePasteEdit.toPlainText())
+                    QMessageBox.information(self, "X 쿠키 저장됨",
+                                            "협조해주셔서 감사합니다! 쿠키가 저장되었습니다. 쿠키 파일은 dat/x_cookies.json"
+                                            "에 저장되어 있으며, 다소 민감한 정보이오니 공유는 가급적 지양 부탁드립니다. "
+                                            "\n\nX 정책에 준수하여 사진을 받기 위해 요청드리는 정보이며, 고독한 조수는 그 어떤 "
+                                            "이유로도 해당 정보를 악의적으로 이용할 의사가 없음을 다시 알려드립니다.",
+                                            QMessageBox.Ok)
+                    self.close()
+
+            cookieConfirmDialog = CookieSettingDialog()
+            cookieConfirmDialog.setGeometry(500, 500, 500, 500)
+            cookieConfirmDialog.exec_()
             self.validateForm()
 
         def browseSaveDir(self):
@@ -347,10 +460,14 @@ class GodokAssistant(QMainWindow):
                 if not self.urlLineEdit.text().startswith("https://x.com/"):
                     return False, "X(트위터)가 아닌 링크는 사용할 수 없습니다."
                 if len(self.saveDirDisplayLabel.text()) == 0: return False, "이미지를 저장할 위치를 선택해주세요."
+                if not os.path.isfile('./dat/x_cookies.json'): return False, "첫 실행에 따른 X 쿠키 설정을 완료해 주세요."
                 return True, "왼쪽 버튼을 눌러주세요!"
 
             res, msg = __validateForm()
             self.browseInitButton.setEnabled(res)
+            self.cookieConfirmDisplayLabel.setText("완료" if os.path.isfile('dat/x_cookies.json') else "설정 필요")
+            self.cookieConfirmDisplayLabel.setStyleSheet(
+                f'color: {"blue" if os.path.isfile("dat/x_cookies.json") else "red"};')
             self.errInfo.setStyleSheet(f"Color : {'blue' if res else 'red'}")
             self.errInfo.setText(msg)
 
@@ -359,9 +476,11 @@ class GodokAssistant(QMainWindow):
 
         def __browseInitResHandle(self, retrieve):
             if len(retrieve[0]) == 0:
-                QMessageBox.warning(self, "찾은 사진 없음", "주어진 링크에서 사진을 찾을 수 없었습니다."
-                                                      "가져오고자 하는 트윗이 공개 트윗인지, 사진이 있는지"
-                                                      "확인 후 다시 시도해주세요. 문제가 지속될 경우 개발자에게"
+                QMessageBox.warning(self, "찾은 사진 없음", "주어진 링크에서 사진을 찾을 수 없었습니다. "
+                                                      "가져오고자 하는 트윗이 공개 트윗인지, 사진이 있는지 "
+                                                      "확인 후 다시 시도해주세요. \n\n특히 해당 트윗이 비로그인 사용자에게 "
+                                                      "비공개된 트윗일 가능성이 높습니다. 이 경우, [X에서 가져오기] 메뉴에서 "
+                                                      "안내에 따라 쿠키 설정을 다시 진행해주세요. 그래도 문제가 지속될 경우 개발자에게 "
                                                       "문의 부탁드립니다!", QMessageBox.Ok)
                 return
             self.superUI.viewDetailDialog(*retrieve)
@@ -389,11 +508,13 @@ class GodokAssistant(QMainWindow):
                 self.close()
 
     class DetailDialog(QDialog):
-        def __init__(self, loadDirList: list[str], metadata: list[dict], desc: str, godok: Godok):
+        def __init__(self, loadDirList: list[str], metadata: list[dict], desc: str, godok: Godok,
+                     enable: bool = True):
             super().__init__()
-            self.setWindowIcon(QIcon('./img/circleicon.ico'))
+            self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
             self.setWindowTitle("사진 자세히 보기")
             self.loadDirList = loadDirList
+            self.exceptList = [False for _ in loadDirList]
             self.godok = godok
             self.imageIndex = 0
             self.metadata_collect = deepcopy(metadata)
@@ -460,6 +581,7 @@ class GodokAssistant(QMainWindow):
             self.originalDirectoryLabel = QLabel("원본 저장 위치", self)
 
             self.sourceLineEdit = QLineEdit(self)
+            self.sourceLineEdit.setEnabled(enable)
             self.sourceLineEdit.setFont(QFont("SUITE", 7))
             self.sourceLineEdit.setMaximumWidth(700)
             self.sourceLineEdit.textEdited.connect(self.updateMetadata)
@@ -467,6 +589,7 @@ class GodokAssistant(QMainWindow):
             self.memberButtonGLayout = QGridLayout()
             self.hommaSettingHLayout = QHBoxLayout()
             self.shootDateEdit = QDateEdit(self)
+            self.shootDateEdit.setEnabled(enable)
             self.shootDateEdit.dateChanged.connect(self.updateMetadata)
             self.shootDateEdit.setDate(QDate.currentDate())
             self.tagGLayout = QGridLayout()
@@ -492,26 +615,32 @@ class GodokAssistant(QMainWindow):
 
             # Components for memberButtonGLayout
             self.lilyButton = QPushButton("릴리", self)
+            self.lilyButton.setEnabled(enable)
             self.lilyButton.setCheckable(True)
             self.lilyButton.released.connect(self.updateMetadata)
 
             self.haewonButton = QPushButton("해원", self)
+            self.haewonButton.setEnabled(enable)
             self.haewonButton.setCheckable(True)
             self.haewonButton.released.connect(self.updateMetadata)
 
             self.sullyoonButton = QPushButton("설윤", self)
+            self.sullyoonButton.setEnabled(enable)
             self.sullyoonButton.setCheckable(True)
             self.sullyoonButton.released.connect(self.updateMetadata)
 
             self.baeButton = QPushButton("배이", self)
+            self.baeButton.setEnabled(enable)
             self.baeButton.setCheckable(True)
             self.baeButton.released.connect(self.updateMetadata)
 
             self.jiwooButton = QPushButton("지우", self)
+            self.jiwooButton.setEnabled(enable)
             self.jiwooButton.setCheckable(True)
             self.jiwooButton.released.connect(self.updateMetadata)
 
             self.kyujinButton = QPushButton("규진", self)
+            self.kyujinButton.setEnabled(enable)
             self.kyujinButton.setCheckable(True)
             self.kyujinButton.released.connect(self.updateMetadata)
 
@@ -525,10 +654,12 @@ class GodokAssistant(QMainWindow):
 
             # Components for hommaSettingHLayout
             self.hommaManualEdit = QLineEdit(self)
+            self.hommaManualEdit.setEnabled(enable)
             self.hommaManualEdit.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             self.hommaManualEdit.textEdited.connect(self.updateMetadata)
 
             self.hommaSelectComboBox = QComboBox(self)
+            self.hommaSelectComboBox.setEnabled(enable)
             __homma_list = sorted(self.godok.hommas)
             self.hommaSelectComboBox.addItems(__homma_list)
             self.hommaSelectComboBox.activated.connect(self.setHommaCombobox)
@@ -547,22 +678,30 @@ class GodokAssistant(QMainWindow):
 
             # Layout settings for tagGLayout
             for i in range(6):
+                self.tagManualEditList[i].setEnabled(enable)
                 self.tagGLayout.addWidget(self.tagManualEditList[i], *divmod(i, 2))
                 self.tagManualEditList[i].textEdited.connect(self.updateMetadata)
 
             # Components for miscSettingGLayout
             self.locateInExplorer = QPushButton("현재 사진의 원본 위치로 이동", self)
             self.locateInExplorer.released.connect(self.locateInExplorerReact)
+            self.exceptButton = QPushButton("제거하기", self)
+            self.exceptButton.setCheckable(True)
+            self.exceptButton.setEnabled(enable)
+            self.exceptButton.released.connect(self.exceptToggle)
             self.copyToClipboard = QPushButton("이 사진 클립보드로 복사하기", self)
             self.copyToClipboard.released.connect(self.copyToClipboardReact)
             self.exportToExplorer = QPushButton("내보내기", self)
             self.exportToExplorer.released.connect(self.exportToExplorerReact)
             self.copyToAllCheckbox = QCheckBox("모든 사진에 현재 페이지의 내용 적용", self)
+            self.copyToAllCheckbox.setEnabled(enable)
             self.completeButton = QPushButton("변경사항 저장", self)
             self.completeButton.pressed.connect(self.sendToGodok)
+            self.completeButton.setEnabled(enable)
 
             # Layout settings for miscSettingGLayout
             self.miscSettingGLayout.addWidget(self.copyToClipboard, 0, 0)
+            self.miscSettingGLayout.addWidget(self.exceptButton, 0, 1)
             self.miscSettingGLayout.addWidget(self.locateInExplorer, 1, 0)
             self.miscSettingGLayout.addWidget(self.exportToExplorer, 1, 1)
             self.miscSettingGLayout.addWidget(self.copyToAllCheckbox, 2, 0)
@@ -584,15 +723,13 @@ class GodokAssistant(QMainWindow):
             GodokAssistant.copy_image_to_clipboard(self.loadDirList[self.imageIndex])
 
         def exportToExplorerReact(self):
-            __sto_abs_path = os.path.abspath('./sto/')
-            for __filename in os.listdir(__sto_abs_path):
-                if __filename.startswith('godok_helper'):
-                    os.remove(os.path.join(__sto_abs_path, __filename))
+            __sto_abs_path = QFileDialog.getExistingDirectory(self, "내보내기 폴더 설정")
 
             source_set = set()
             for __idx in range(len(self.loadDirList)):
                 __path = self.loadDirList[__idx]
-                shutil.copy(__path, os.path.join(__sto_abs_path, f'godok_helper_{__idx + 1}.png'))
+                shutil.copy(__path, os.path.join(__sto_abs_path, f'고독한조수_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+                                                                 f'_{__idx + 1}.png'))
                 if len(__source := self.metadata_collect[__idx]['source']) > 0:
                     source_set.add(__source)
 
@@ -624,6 +761,10 @@ class GodokAssistant(QMainWindow):
 
             __orgdir = __local_metadata.get('dir', '')
             self.originalDirectoryDisplayLabel.setText(('...' if len(__orgdir) > 60 else '') + __orgdir[-60:])
+            self.exceptButton.setChecked(self.exceptList[self.imageIndex])
+
+        def exceptToggle(self):
+            self.exceptList[self.imageIndex] = self.exceptButton.isChecked()
 
         def transitionPixmap(self, left: bool):
             if left: return self.loadPixmap(max(0, self.imageIndex - 1))
@@ -663,19 +804,20 @@ class GodokAssistant(QMainWindow):
 
         def sendToGodok(self):
             __progressbar = ProgressDialog(self)
-            __worker = WorkerThread(self.__sendToGodokInternal)
+            __worker = WorkerThread(self.__sendToGodokInternal, self.copyToAllCheckbox.isChecked())
             __worker.progress_updated.connect(__progressbar.update_progress)
             __worker.finished.connect(__progressbar.accept)
 
+            self.close()
             __worker.start()
             __progressbar.exec_()
 
-        def __sendToGodokInternal(self, progress_callback):
-            for i, (__path, __meta) in enumerate(zip(self.loadDirList, self.metadata_collect)):
-                if self.copyToAllCheckbox.isChecked():
-                    self.godok.add_entry(__path, self.metadata_collect[self.imageIndex])
+        def __sendToGodokInternal(self, progress_callback, to_all):
+            for i, (__path, __meta, __rm) in enumerate(zip(self.loadDirList, self.metadata_collect, self.exceptList)):
+                if __rm: self.godok.remove_entry(__path)
                 else:
-                    self.godok.add_entry(__path, __meta)
+                    if to_all: self.godok.add_entry(__path, self.metadata_collect[self.imageIndex])
+                    else: self.godok.add_entry(__path, __meta)
                 progress_callback(((i + 1) * 100) // len(self.loadDirList))
 
             self.godok.export()
@@ -686,8 +828,12 @@ class GodokAssistant(QMainWindow):
         self.godok = Godok()
 
         # Visual aspects
-        QApplication.setFont(QFont("SUITE", 10))
-        self.setWindowIcon(QIcon('./img/circleicon.ico'))
+        __suitefontid = QFontDatabase.addApplicationFont(resource_path("fonts/SUITE-Regular.ttf"))
+        __suitefontfamily = QFontDatabase.applicationFontFamilies(__suitefontid)
+        if __suitefontfamily:
+            self.font = QFont(__suitefontfamily[0], 10)
+            QApplication.setFont(self.font)
+        self.setWindowIcon(QIcon(resource_path('./img/circleicon.ico')))
 
         # Initiator functions
         self.initUI()
@@ -695,7 +841,7 @@ class GodokAssistant(QMainWindow):
         self.initLogic()
 
         # Geometry
-        self.setWindowTitle("고독방 도우미")
+        self.setWindowTitle("고독한 조수")
         self.setGeometry(100, 100, 636, 480)
         self.show()
 
@@ -732,7 +878,7 @@ class GodokAssistant(QMainWindow):
         self.creditsNameLabel.setAlignment(Qt.AlignCenter)
         self.creditsChatroomLabel = QLabel("[엔써들의 찬란한 모임 & 엔끌벅적 엔써들의 소통방]", self)
         self.creditsChatroomLabel.setAlignment(Qt.AlignCenter)
-        self.creditsVersionLabel = QLabel("ver 1.0.0 / 2025.06.23.", self)
+        self.creditsVersionLabel = QLabel("ver 1.0.0 / 2025.06.29.", self)
         self.creditsVersionLabel.setAlignment(Qt.AlignCenter)
 
         # Layout settings for searchSettingVLayout
@@ -1053,7 +1199,6 @@ class GodokAssistant(QMainWindow):
         # Layout settings for miscTabVLayout
         self.miscTabVLayout.addStretch(1)
         self.miscTabVLayout.addWidget(self.includeBanHommaCheckBox)
-        self.miscTabVLayout.addWidget(self.includeBubbleCheckBox)
         self.miscTabVLayout.addStretch(1)
 
     # noinspection PyAttributeOutsideInit
@@ -1110,6 +1255,11 @@ class GodokAssistant(QMainWindow):
         # HelpBar
         self.helpMenu = self.menubar.addMenu('도움말')
 
+        self.tutorialAction = QAction('사용 방법 도움말', self)
+        self.helpMenu.addAction(self.tutorialAction)
+        self.tutorialAction.triggered.connect(partial(GodokAssistant.openURL,
+                                                      "https://buttered-spike-9ec.notion.site/220ebce8260580cbba54cfb618f19310?source=copy_link"))
+
     # noinspection PyAttributeOutsideInit
     def initLogic(self):
         self.tagCondition = []
@@ -1119,6 +1269,11 @@ class GodokAssistant(QMainWindow):
         self.updateHommaComboBox()
         self.updateTagConditionDisplay()
         self.updateHommaConditionDisplay()
+
+    @staticmethod
+    def openURL(url):
+        import webbrowser
+        webbrowser.open(url)
 
     def setBubbleFolderReact(self):
         if fname := QFileDialog.getExistingDirectory(self, "버블 폴더 설정"):
@@ -1144,7 +1299,9 @@ class GodokAssistant(QMainWindow):
         self.viewDetailDialog(paths, metas, '')
 
     def searchSimilarPhotos(self):
-        similarityDialog = GodokAssistant.SimilarityDialog(self)
+        similarityDialog = GodokAssistant.SimilarityDialog(self, msg='검색 결과에 버블이 포함될 가능성이 있을 경우 사진'
+                                                                     '내용을 편집할 수 없습니다. 사진 내용을 편집하고자'
+                                                                     '한다면 "버블 제외" 옵션을 사용해주십시오.')
         similarityDialog.setGeometry(500, 500, 500, 500)
         similarityDialog.exec_()
 
@@ -1154,15 +1311,33 @@ class GodokAssistant(QMainWindow):
                                  QMessageBox.Ok)
             return
 
-        similarityDialog = GodokAssistant.SimilarityDialog(self)
+        similarityDialog = GodokAssistant.SimilarityDialog(self, enable=False,
+                                                           msg='버블 폴더의 사진 중 주어진 사진과 가장 비슷하다고 판단되는 '
+                                                               '사진들을 유사한 순서대로 찾았습니다. 최종 버블 여부는 '
+                                                               '육안으로 확인하십시오.')
         similarityDialog.bubbleOnlyRadio.setChecked(True)
+        similarityDialog.bubbleAllRadio.setEnabled(False)
+        similarityDialog.bubbleOnlyRadio.setEnabled(False)
+        similarityDialog.bubbleNoRadio.setEnabled(False)
+        similarityDialog.hommaAllRadio.setEnabled(False)
+        similarityDialog.hommaOnlyRadio.setEnabled(False)
+        similarityDialog.hommaNoRadio.setEnabled(False)
         similarityDialog.importFromClipboardReact()
         similarityDialog.setGeometry(500, 500, 500, 500)
         similarityDialog.exec_()
 
     def clipboardBanHommaTest(self):
-        similarityDialog = GodokAssistant.SimilarityDialog(self)
+        similarityDialog = GodokAssistant.SimilarityDialog(self, enable=False,
+                                                           msg='금홈의 사진 중 주어진 사진과 비슷하다고 판단되는 사진들을'
+                                                               '유사한 순서대로 찾았습니다. 최종 금홈 여부는 주어진 사진의'
+                                                               '로고 및 육안으로 확인하십시오.')
         similarityDialog.hommaOnlyRadio.setChecked(True)
+        similarityDialog.bubbleAllRadio.setEnabled(False)
+        similarityDialog.bubbleOnlyRadio.setEnabled(False)
+        similarityDialog.bubbleNoRadio.setEnabled(False)
+        similarityDialog.hommaAllRadio.setEnabled(False)
+        similarityDialog.hommaOnlyRadio.setEnabled(False)
+        similarityDialog.hommaNoRadio.setEnabled(False)
         similarityDialog.importFromClipboardReact()
         similarityDialog.setGeometry(500, 500, 500, 500)
         similarityDialog.exec_()
@@ -1204,8 +1379,15 @@ class GodokAssistant(QMainWindow):
         self.hommaSearchComboBox.clear()
         self.hommaSearchComboBox.addItems(self.godok.hommas)
 
-    def viewDetailDialog(self, loadDirList: list[str], metadata: list[dict], desc: str):
-        detailDialog = GodokAssistant.DetailDialog(loadDirList, metadata, desc, self.godok)
+    def viewDetailDialog(self, loadDirList: list[str], metadata: list[dict], desc: str,
+                         enable: bool = True, msg: str = ''):
+        if len(loadDirList) == 0:
+            QMessageBox.information(self, "대상 사진 없음", "조건을 만족하는 사진을 찾지 못했습니다.", QMessageBox.Ok)
+            return
+        if len(msg) > 0:
+            QMessageBox.information(self, "안내", msg, QMessageBox.Ok)
+
+        detailDialog = GodokAssistant.DetailDialog(loadDirList, metadata, desc, self.godok, enable=enable)
         detailDialog.setGeometry(500, 500, 500, 500)
         detailDialog.exec_()
 
