@@ -43,18 +43,18 @@ class Counter:
     def assign_birthtime_scores(self) -> dict[str, dict[str, int]]:
         __BIRTHTIME_ORDER = ['오전 솔시', '오전 설시', '오전 행시', '오전 쮸시', '오전 뀨시', '오전 릴시',
                              '오후 솔시', '오후 설시', '오후 행시', '오후 쮸시', '오후 뀨시', '오후 릴시']
-        __BIRTHTIME_TABLE = {'오전 솔시': ((0, 28), {'솔', '배이'}),
-                             '오전 설시': ((1, 26), {'설', '설윤'}),
-                             '오전 행시': ((2, 25), {'행', '해원'}),
-                             '오전 쮸시': ((4, 13), {'쮸', '지우'}),
-                             '오전 뀨시': ((5, 26), {'뀨', '규진'}),
-                             '오전 릴시': ((10, 17), {'릴', '릴리'}),
-                             '오후 솔시': ((12, 28), {'솔', '배이'}),
-                             '오후 설시': ((13, 26), {'설', '설윤'}),
-                             '오후 행시': ((14, 25), {'행', '해원'}),
-                             '오후 쮸시': ((16, 13), {'쮸', '지우'}),
-                             '오후 뀨시': ((17, 26), {'뀨', '규진'}),
-                             '오후 릴시': ((22, 17), {'릴', '릴리'})}
+        __BIRTHTIME_TABLE = {'오전 솔시': ((0, 28), {'솔', '배이', '이모티콘', '뵤', '뱅', '소올', 'sol'}),
+                             '오전 설시': ((1, 26), {'설', '설윤', '이모티콘', '윤아', '서얼', 'sul'}),
+                             '오전 행시': ((2, 25), {'행', '해원', '이모티콘', '농담', '담곰', 'haewon', 'hae'}),
+                             '오전 쮸시': ((4, 13), {'쮸', '지우', '이모티콘', '댕', 'woo'}),
+                             '오전 뀨시': ((5, 26), {'뀨', '규진', '이모티콘', '냥', 'kyu'}),
+                             '오전 릴시': ((10, 17), {'릴', '릴리', '이모티콘', '댕', 'lil'}),
+                             '오후 솔시': ((12, 28), {'솔', '배이', '이모티콘', '뵤', '뱅', '소올', 'sol'}),
+                             '오후 설시': ((13, 26), {'설', '설윤', '이모티콘', '윤아', '서얼', 'sul'}),
+                             '오후 행시': ((14, 25), {'행', '해원', '이모티콘', '농담', '담곰', 'haewon', 'hae'}),
+                             '오후 쮸시': ((16, 13), {'쮸', '지우', '이모티콘', '댕', 'woo'}),
+                             '오후 뀨시': ((17, 26), {'뀨', '규진', '이모티콘', '냥', 'kyu'}),
+                             '오후 릴시': ((22, 17), {'릴', '릴리', '이모티콘', '댕', 'lil'})}
 
         assignment: dict[str, dict[str, int]] = {}
 
@@ -64,31 +64,30 @@ class Counter:
             __twhole = Dialogue.hm_to_whole(__BIRTHTIME_TABLE[__tdesc][0])
             __success_temp = []
 
-            for dialogue in dialogues:
-                # Whenever the clock ticks by at least a minute
-                if current_time_whole < dialogue.time_whole:
-                    current_time_whole = dialogue.time_whole
+            for dialogue in dialogues + [None]:
+                if dialogue is None: current_time_whole += 1
+                else: current_time_whole = dialogue.time_whole
 
-                    # When a birthtime passes, assign scores
-                    if current_time_whole > __twhole:
-                        if len(__success_temp) != 0:
-                            # Assign first birthtime success (+2)
-                            __birthtime_asg = {k: (1 if __twhole < 720 else 0) for k in __success_temp}
-                            __birthtime_asg[__success_temp[0]] += 2
-                            __birthtime_asg[__success_temp[-1]] += 2
-                            if len(__success_temp) >= 3: __birthtime_asg[__success_temp[2]] += 1
-                            assignment[f'{date} {__tdesc}'] = __birthtime_asg
+                # When a birthtime passes, assign scores
+                if current_time_whole > __twhole:
+                    if len(__success_temp) != 0:
+                        # Assign first birthtime success (+2)
+                        __birthtime_asg = {k: (1 if __twhole < 720 else 0) for k in __success_temp}
+                        __birthtime_asg[__success_temp[0]] += 2
+                        __birthtime_asg[__success_temp[-1]] += 2
+                        if len(__success_temp) >= 3: __birthtime_asg[__success_temp[2]] += 1
+                        assignment[f'{date} {__tdesc}'] = __birthtime_asg
 
-                        # Rotate birthtime agendas until a valid target (1338: One minute after Lily PM)
+                    # Rotate birthtime agendas until a valid target (1338: One minute after Lily PM)
+                    __BIRTHTIME_ORDER.append(__BIRTHTIME_ORDER.pop(0))
+                    __tdesc = __BIRTHTIME_ORDER[0]
+                    __twhole = Dialogue.hm_to_whole(__BIRTHTIME_TABLE[__tdesc][0])
+                    while __twhole < current_time_whole < 1338:
                         __BIRTHTIME_ORDER.append(__BIRTHTIME_ORDER.pop(0))
                         __tdesc = __BIRTHTIME_ORDER[0]
                         __twhole = Dialogue.hm_to_whole(__BIRTHTIME_TABLE[__tdesc][0])
-                        while __twhole < current_time_whole < 1338:
-                            __BIRTHTIME_ORDER.append(__BIRTHTIME_ORDER.pop(0))
-                            __tdesc = __BIRTHTIME_ORDER[0]
-                            __twhole = Dialogue.hm_to_whole(__BIRTHTIME_TABLE[__tdesc][0])
 
-                        __success_temp.clear()
+                    __success_temp.clear()
 
                 # Check for birthtime success
                 if __twhole == current_time_whole:
@@ -124,6 +123,6 @@ class Counter:
 
 
 if __name__ == '__main__':
-    c = Counter('../dat/KakaoTalk_20250621_1444_43_590_group.txt')
+    c = Counter('../dat/KakaoTalk_20250707_0127_01_304_group.txt', 20250707, 20250708)
     for k, v in c.assign_birthtime_scores().items():
         print(f'{k}: {v}')

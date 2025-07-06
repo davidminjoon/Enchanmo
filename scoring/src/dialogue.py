@@ -77,7 +77,9 @@ class Dialogue:
         if self.hm_to_whole(birthtime_hm) != self.time_whole: return False
 
         # Check letter containment constraint
-        return len(set(self.dialogue).intersection(test_chars)) != 0
+        for test_char in test_chars:
+            if test_char in self.dialogue: return True
+        return False
 
     def get_link_domain(self) -> list[str]:
         """
